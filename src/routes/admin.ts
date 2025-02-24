@@ -1,9 +1,8 @@
 import express from 'express';
-import { updateHero, updateClients, updateServices, getHero, getClients, getServices } from '../controllers/adminController';
+import { updateHero, updateClients, updateServices, getHero, getClients, getServices, addService, deleteService } from '../controllers/adminController';
 import authMiddleware from '../middleware/authMiddleware';
 import multer from 'multer';
 
-// Configurer multer pour capturer les fichiers temporairement
 const upload = multer({ dest: 'uploads/' });
 
 const router = express.Router();
@@ -106,8 +105,8 @@ router.get('/get-clients', getClients);
 /**
  * @swagger
  * /api/admin/update-services:
- *   post:
- *     summary: Mettre à jour la section Services avec ou sans image
+ *   patch:
+ *     summary: Mettre à jour plusieurs services (titre, description, image)
  *     security:
  *       - bearerAuth: []
  *     tags:
@@ -119,22 +118,30 @@ router.get('/get-clients', getClients);
  *           schema:
  *             type: object
  *             properties:
- *               title:
+ *               services:
  *                 type: string
- *               description:
- *                 type: string
- *               image:
- *                 type: string
- *                 format: binary
+ *                 description: "Tableau JSON des services à mettre à jour"
+ *                 example: '[{"id": "123", "title": "Nouveau Titre", "description": "Nouvelle Description"}, {"id": "456", "title": "Autre Titre"}]'
+ *               images:
+ *                 type: object
+ *                 additionalProperties:
+ *                   type: string
+ *                   format: binary
+ *                   description: "Image associée à un service (clé = ID du service)"
  *     responses:
  *       200:
- *         description: Mise à jour réussie
+ *         description: Services mis à jour avec succès
+ *       400:
+ *         description: Requête invalide (format incorrect, ID manquant, etc.)
  *       401:
- *         description: Non autorisé
+ *         description: Non autorisé (JWT manquant ou invalide)
+ *       404:
+ *         description: Un ou plusieurs services non trouvés
  *       500:
  *         description: Erreur interne du serveur
  */
 router.patch('/update-services', authMiddleware, upload.any(), updateServices);
+
 
 /**
  * @swagger
@@ -173,5 +180,110 @@ router.get('/get-hero', getHero);
  *         description: Erreur interne du serveur
  */
 router.get('/get-services', getServices);
+
+
+/**
+ * @swagger
+ * /api/admin/add-service:
+ *   post:
+ *     summary: Ajouter un nouveau service (max 4)
+ *     security:
+ *       - bearerAuth: []
+ *     tags:
+ *       - Admin
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: "Titre du service"
+ *               description:
+ *                 type: string
+ *                 description: "Description du service"
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: "Fichier image à uploader"
+ *     responses:
+ *       201:
+ *         description: Service ajouté avec succès
+ *       400:
+ *         description: Requête invalide (plus de 4 services, champs manquants)
+ *       401:
+ *         description: Non autorisé (JWT manquant ou invalide)
+ *       500:
+ *         description: Erreur interne du serveur
+ */
+
+/**
+ * @swagger
+ * /api/admin/add-service:
+ *   post:
+ *     summary: Ajouter un nouveau service (max 4)
+ *     security:
+ *       - bearerAuth: []
+ *     tags:
+ *       - Admin
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: "Titre du service"
+ *               description:
+ *                 type: string
+ *                 description: "Description du service"
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: "Fichier image à uploader"
+ *     responses:
+ *       201:
+ *         description: Service ajouté avec succès
+ *       400:
+ *         description: Requête invalide (plus de 4 services, champs manquants)
+ *       401:
+ *         description: Non autorisé (JWT manquant ou invalide)
+ *       500:
+ *         description: Erreur interne du serveur
+ */
+router.post('/add-service', authMiddleware, upload.single('image'), addService);
+
+/**
+ * @swagger
+ * /api/admin/delete-service/{id}:
+ *   delete:
+ *     summary: Supprimer un service par ID
+ *     security:
+ *       - bearerAuth: []
+ *     tags:
+ *       - Admin
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du service à supprimer
+ *     responses:
+ *       200:
+ *         description: Service supprimé avec succès
+ *       400:
+ *         description: Requête invalide (ID non trouvé)
+ *       401:
+ *         description: Non autorisé (JWT manquant ou invalide)
+ *       500:
+ *         description: Erreur interne du serveur
+ */
+
+router.delete('/delete-service/:id', authMiddleware, deleteService);
 
 export default router;

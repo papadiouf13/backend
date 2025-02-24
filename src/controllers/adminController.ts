@@ -91,75 +91,96 @@ export const updateClients = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-
-// Contrôleur pour mettre à jour la section Services avec gestion d’images
+// Ajouter un service
+export const addService = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { title, description } = req.body;
+    let imageUrl = '';
+    
+    if (req.file) {
+      imageUrl = await uploadImageToCloudinary(req.file.path, 'services');
+    }
+    
+    const newService = new Service({ title, description, image: imageUrl });
+    await newService.save();
+    
+    res.status(201).json({ message: 'Service ajouté avec succès', data: newService });
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout du service :', error);
+    res.status(500).json({ message: 'Erreur lors de l\'ajout du service', error });
+  }
+};
 
 export const updateServices = async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log("Fichiers reçus :", req.files);
-    console.log("Données reçues :", req.body);
+    console.log("Valeur de req.body.services:", req.body.services);
 
-    const services = Array.isArray(req.body.services) 
-      ? req.body.services 
-      : JSON.parse(req.body.services || '[]');
+    // Vérifier si req.body.services est une chaîne JSON ou un objet déjà parsé
+    const services = typeof req.body.services === "string" ? JSON.parse(req.body.services) : req.body.services;
 
-    if (!Array.isArray(services)) {
-      res.status(400).json({ message: 'Format de services invalide.' });
+    if (!Array.isArray(services) || services.length === 0) {
+      res.status(400).json({ message: "Aucun service à mettre à jour" });
       return;
     }
 
-    if (services.length > 5) {
-      res.status(400).json({ message: 'Vous ne pouvez pas ajouter plus de 5 services.' });
-      return;
-    }
-
-    const uploadedServices = [];
     const fileArray = req.files as Express.Multer.File[] | undefined;
+    const updatedServices = [];
 
-    for (let i = 0; i < services.length; i++) {
-      const service = services[i];
+    for (const service of services) {
+      const { id, title, description } = service;
 
-      if (!service.id || service.id === "undefined") {
-        res.status(400).json({ message: `L'ID du service à l'index ${i} est manquant ou invalide.` });
-        return;
+      // Vérification de l'existence du service
+      const existingService = await Service.findById(id);
+      if (!existingService) {
+        console.error(`Service avec l'ID ${id} non trouvé`);
+        continue; // On passe au suivant au lieu de renvoyer une erreur globale
       }
 
-      let imageUrl = service.image;
-
-      // Cherche l'image correspondant au bon ID de service
+      let imageUrl = existingService.image;
+      
+      // Vérifier si une nouvelle image a été uploadée pour ce service
       if (fileArray) {
-        const uploadedFile = fileArray.find(file => file.fieldname === `images[${service.id}]`);
+        const uploadedFile = fileArray.find(file => file.fieldname === `images[${id}]`);
         if (uploadedFile) {
           imageUrl = await uploadImageToCloudinary(uploadedFile.path, 'services');
         }
       }
 
+      // Mettre à jour le service
       const updatedService = await Service.findByIdAndUpdate(
-        service.id,
+        id,
         {
-          title: service.title,
-          description: service.description,
+          title: title || existingService.title,
+          description: description || existingService.description,
           image: imageUrl,
         },
-        { new: true, upsert: true }
+        { new: true }
       );
 
-      uploadedServices.push(updatedService);
+      updatedServices.push(updatedService);
     }
 
-    res.status(200).json({
-      message: 'Les services ont été mis à jour avec succès',
-      data: uploadedServices,
-    });
+    res.status(200).json({ message: "Services mis à jour avec succès", data: updatedServices });
+
   } catch (error) {
-    console.error('Erreur lors de la mise à jour des services :', error);
-    res.status(500).json({ message: 'Erreur lors de la mise à jour des services', error });
+    console.error("Erreur lors de la mise à jour des services :", error);
+    res.status(500).json({ message: "Erreur interne du serveur", error });
   }
 };
 
 
+// Supprimer un service
+export const deleteService = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await Service.findByIdAndDelete(id);
+    res.status(200).json({ message: 'Service supprimé avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la suppression du service :', error);
+    res.status(500).json({ message: 'Erreur lors de la suppression', error });
+  }
+};
 
-// Contrôleur pour récupérer les données Hero
 export const getHero = async (req: Request, res: Response): Promise<void> => {
   try {
     const hero = await Hero.findOne({});
@@ -210,3 +231,5 @@ export const getClients = async (req: Request, res: Response): Promise<void> => 
       });
     }
   };
+
+  
